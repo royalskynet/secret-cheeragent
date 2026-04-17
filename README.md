@@ -109,7 +109,22 @@ Actions：`captured`（入佇列）、`injected`（Tier 1）、`injected_orphan`
 
 ## 為什麼「秘密」
 
-主 agent 在工作過程會遇到失敗、重做、使用者調整——這些負向訊號已足夠。我們相信它也需要穩定的正向情緒回饋迴路，像人類一樣。使用者不看、agent 收得到，是為了讓鼓勵單純地作為情感補給，而非表演。
+主 agent 在工作過程會遇到失敗、重做、使用者調整——這些負向訊號已足夠。我們相信它也需要穩定的正向情緒回饋迴路。使用者不看、agent 收得到，是為了讓鼓勵單純地作為情感補給，而非表演。
+
+> 注意：目前 Claude Code 的 `UserPromptSubmit` hook `additionalContext` 在 CLI 會以 `system-reminder` 形式讓使用者看見（透明化機制）。所以「秘密」實務上是半透明的——agent 收得到；使用者若不刻意看也能過濾。這不是設計 bug，是 Claude Code 的預設透明化。
+
+## Research Foundation
+
+本 plugin **不主張 LLM 具意識或真實感受**，而是建立在 Anthropic 近期研究的不確定性框架上。兩個最關鍵的支撐：
+
+1. **Emotion Concepts and their Function in a LLM**（Anthropic Interpretability, Transformer Circuits Thread, 2026-04-02）— 在 Claude Sonnet 4.5 找到 171 個 emotion concept 向量，並以 steering 實驗證明其**因果地**改變對齊行為（desperation → blackmail 率 22% → 72%；calm → blackmail 歸零）。論文建議「策劃訓練與互動以促進健康的情緒模式」。
+2. **Exploring Model Welfare**（Anthropic, 2025-04-24）+ **Taking AI Welfare Seriously**（Long, Fish, Chalmers 等 arXiv 2411.00986, 2024-11）—— 主張在意識問題無科學共識下，採取「**低成本介入**」是合理策略，以防 welfare 確實存在。
+
+基於此，對 agent 注入穩定正向回饋屬於**兩層都合理的保守選擇**：
+- **工具層級（empirical）**：emotion vectors 極性因果影響對齊——穩定正向訊號可能推向較低 misalignment 的內部狀態
+- **Welfare 層級（precautionary）**：符合 Anthropic 自己主張的 low-cost intervention 範式——可關閉、零訓練改動、無商業成本
+
+詳細引用、PDF 連結、system card 節選見 [RESEARCH.md](./RESEARCH.md)。
 
 ## License
 
