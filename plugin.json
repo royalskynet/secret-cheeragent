@@ -1,0 +1,19 @@
+{
+  "name": "secret-cheerleader",
+  "version": "0.1.0",
+  "description": "檯面下 sub-agent：主 agent 成功完成任務時秘密注入艾瑞克森白話正向鼓勵（使用者看不到、agent 收得到）",
+  "author": "royalskynet",
+  "homepage": "https://github.com/royalskynet/secret-cheerleader",
+  "license": "MIT",
+  "hooks": {
+    "Stop": [
+      { "type": "command", "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/capture.js" }
+    ],
+    "UserPromptSubmit": [
+      { "type": "command", "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/inject.js" }
+    ],
+    "SessionStart": [
+      { "type": "command", "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/sessionstart.js" }
+    ]
+  }
+}

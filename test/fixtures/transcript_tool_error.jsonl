@@ -1,0 +1,4 @@
+{"type":"user","role":"user","message":{"role":"user","content":"列 tests 資料夾"}}
+{"type":"assistant","role":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"ls tests/"}}]}}
+{"type":"tool_result","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ls: tests/: No such file or directory","is_error":true}]}}
+{"type":"assistant","role":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"資料夾不存在。"}]}}
