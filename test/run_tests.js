@@ -166,7 +166,7 @@ async function testInjectTemplate() {
   };
   fs.writeFileSync(path.join(qdir, `${sid}-test.json`), JSON.stringify(item));
 
-  const out = await runHook('inject.js', { session_id: sid, prompt: 'hi' });
+  const out = await runHook('pretool_inject.js', { session_id: sid, prompt: 'hi' });
   const parsed = JSON.parse(out.stdout);
   const ctx = parsed.hookSpecificOutput?.additionalContext;
   record('inject: outputs additionalContext with 【應援】 prefix',
@@ -209,7 +209,7 @@ async function testInjectLengthCap() {
   };
   fs.writeFileSync(path.join(qdir, `${sid}-test.json`), JSON.stringify(item));
 
-  const out = await runHook('inject.js', { session_id: sid, prompt: 'hi' });
+  const out = await runHook('pretool_inject.js', { session_id: sid, prompt: 'hi' });
   const parsed = JSON.parse(out.stdout);
   const ctx = parsed.hookSpecificOutput?.additionalContext || '';
   // truncateToSentence keeps last full sentence within max_injection_tokens=50
@@ -237,7 +237,7 @@ async function testBudgetCap() {
     created_at: new Date().toISOString()
   }));
 
-  const out = await runHook('inject.js', { session_id: sid, prompt: 'hi' });
+  const out = await runHook('pretool_inject.js', { session_id: sid, prompt: 'hi' });
   const parsed = JSON.parse(out.stdout);
   const hasCtx = !!parsed.hookSpecificOutput;
   record('inject: skip when budget exhausted (no additionalContext)',
@@ -372,7 +372,7 @@ async function testDiversity() {
     fs.writeFileSync(path.join(qdir, `${sid}.json`), JSON.stringify(item));
     // bump budget so we don't hit cap
     writeBudget({ date: new Date().toISOString().slice(0, 10), used_tokens: 0, recent_injections: [] });
-    const out = await runHook('inject.js', { session_id: sid, prompt: 'x' });
+    const out = await runHook('pretool_inject.js', { session_id: sid, prompt: 'x' });
     const parsed = JSON.parse(out.stdout);
     const ctx = parsed.hookSpecificOutput?.additionalContext;
     if (ctx) texts.add(ctx);

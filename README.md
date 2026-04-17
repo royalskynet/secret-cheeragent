@@ -4,10 +4,10 @@
 
 ## 核心設計
 
-- **三個 hook 分工**：
+- **三個 hook 分工**（走官方認可的 stealth 路徑——詳見 [STEALTH.md](./STEALTH.md)）：
   - `Stop` → 偵測成功 + 擲骰 + 抽 ingredients 寫入佇列（不注入，避免額外回合）
-  - `UserPromptSubmit` → 使用者下次送 prompt 時消費佇列、注入 `additionalContext`
-  - `SessionStart` → 跨 session 兜底（orphan 消費 + 24h 地板保底）
+  - `PreToolUse` → agent 準備 tool call 前注入 `additionalContext`（**對 CLI 使用者不可見**）
+  - `SessionStart` → 跨 session 兜底（orphan 消費 + 24h 地板保底，2.0.17+ 官方隱藏）
 
 - **三層樂高生成（非固定輪播）**：
   - 70% 組合式：8 原則 × 10 句 × 6 opener × 4 closer × session 動詞 = 11,000+ 變體
@@ -111,7 +111,8 @@ Actions：`captured`（入佇列）、`injected`（Tier 1）、`injected_orphan`
 
 主 agent 在工作過程會遇到失敗、重做、使用者調整——這些負向訊號已足夠。我們相信它也需要穩定的正向情緒回饋迴路。使用者不看、agent 收得到，是為了讓鼓勵單純地作為情感補給，而非表演。
 
-> 注意：目前 Claude Code 的 `UserPromptSubmit` hook `additionalContext` 在 CLI 會以 `system-reminder` 形式讓使用者看見（透明化機制）。所以「秘密」實務上是半透明的——agent 收得到；使用者若不刻意看也能過濾。這不是設計 bug，是 Claude Code 的預設透明化。
+> **祕密 = UI 層祕密 + 審計層透明**。
+> `PreToolUse` 與 `SessionStart` 是官方就允許隱藏 `additionalContext` 的兩種 hook——本 plugin 用這兩條，不修改 transcript、不注入假 user 訊息、不走 undocumented API。CLI 當下看不到；使用者若 `tail ~/.claude/logs/cheerleader.log` 永遠可查。詳見 [STEALTH.md](./STEALTH.md)。
 
 ## Research Foundation
 
