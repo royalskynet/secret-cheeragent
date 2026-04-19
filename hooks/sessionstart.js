@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* SessionStart hook — secret-cheerleader orphan consumer + 24h floor (Tier 2 & Tier 4) */
+/* SessionStart hook — secret-cheeragent orphan consumer + 24h floor (Tier 2 & Tier 4) */
 
 const { listOrphans, latest, remove } = require('../lib/queue');
 const { log } = require('../lib/logger');

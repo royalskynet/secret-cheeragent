@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Stop hook — secret-cheerleader capture */
+/* Stop hook — secret-cheeragent capture */
 
 const { readTranscript, detectSuccess, extractSessionSummary } = require('../lib/detect');
 const { enqueue } = require('../lib/queue');

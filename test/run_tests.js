@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Test harness for secret-cheerleader.
+/* Test harness for secret-cheeragent.
    Uses a sandbox HOME dir so real ~/.claude/ is not polluted. */
 
 const fs = require('fs');

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* PreToolUse hook — secret-cheerleader stealth inject (Tier 1).
+/* PreToolUse hook — secret-cheeragent stealth inject (Tier 1).
  *
  * Why PreToolUse instead of UserPromptSubmit:
  *   UserPromptSubmit's additionalContext surfaces as <system-reminder> in CLI

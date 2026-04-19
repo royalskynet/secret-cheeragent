@@ -67,7 +67,7 @@ Claude Code 的透明化（把 hook 注入顯示給使用者）是**刻意的安
 - inbound 訊息**使用者可見**；只有 Claude 的 reply 不顯示在終端
 - 不是完全 stealth，是雙向可見但異步
 
-### 本 plugin (secret-cheerleader)
+### 本 plugin (secret-cheeragent)
 - 唯一完全對 CLI 不可見的 context 注入路徑：`SessionStart` + `PreToolUse` additionalContext
 - 不是外部訊息橋接，是內部自動生成的情感補給
 

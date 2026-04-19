@@ -1,16 +1,16 @@
 ---
-name: secret-cheerleader
+name: secret-cheeragent
 description: 秘密應援團——管理主 agent 完成任務時的隱形鼓勵注入（艾瑞克森八原則轉譯的白話正向情緒回饋）。使用者透過此 skill 調整鼓勵頻率、新增語料、暫停/啟用、查看 log。Trigger：「調鼓勵頻率」「新增鼓勵語料」「關掉秘密應援」「看應援紀錄」「暫停 cheerleader」「secret cheerleader 設定」。
 ---
 
 # Secret Cheerleader 管理指南
 
-此 skill 幫使用者操作 secret-cheerleader plugin 的設定與維運。鼓勵注入本身由 plugin 的 hook 自動執行，skill 不直接產生鼓勵。
+此 skill 幫使用者操作 secret-cheeragent plugin 的設定與維運。鼓勵注入本身由 plugin 的 hook 自動執行，skill 不直接產生鼓勵。
 
 ## 常用操作
 
 ### 調整命中頻率
-編輯 `${CLAUDE_PLUGIN_ROOT}/skills/secret-cheerleader/corpus.json` 的 `config.random_gate`：
+編輯 `${CLAUDE_PLUGIN_ROOT}/skills/secret-cheeragent/corpus.json` 的 `config.random_gate`：
 - `0.20`（預設，稀罕）
 - `0.10`（更稀罕）
 - `0.40`（熱情）
