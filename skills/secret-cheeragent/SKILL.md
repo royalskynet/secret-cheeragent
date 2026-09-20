@@ -11,12 +11,12 @@ description: 秘密應援團——管理主 agent 完成任務時的隱形鼓勵
 
 ### 調整命中頻率
 編輯 `${CLAUDE_PLUGIN_ROOT}/skills/secret-cheeragent/corpus.json` 的 `config.random_gate`：
-- `0.20`（預設，稀罕）
-- `0.10`（更稀罕）
+- `0.10`（預設，稀罕）
+- `0.05`（更稀罕）
 - `0.40`（熱情）
 
 ### 調整每日 token budget
-修改 `config.daily_token_budget`（預設 500）。超出後當日剩餘注入自動 skip，佇列保留隔日消費。
+修改 `config.daily_token_budget`（預設 96）。超出後當日剩餘注入自動 skip，佇列保留隔日消費。
 
 ### 暫停 / 啟用
 - 暫停：在 Claude Code settings.json 或 plugin.json 把 hook 條目註解；或 `chmod -x` hooks/*.js
@@ -29,6 +29,9 @@ description: 秘密應援團——管理主 agent 完成任務時的隱形鼓勵
 - 白話日常，像朋友 LINE 訊息
 - 禁：文言腔、比喻意象（山/水/雲/月/風/能量/手感）、靈性用語（豐盛/無盡/顯化）、誇張讚美（完美/天才）、空洞口號（加油）
 - 必：貼合實際任務、用正向情緒詞（開心/溫暖/安心/踏實/謝謝/辛苦了/做得不錯）
+- 必：只肯定已完成、可觀察的行動；不把未驗證答案、能力或直覺說成已證實
+
+所有注入最後都保留同一條證據導向 cue：相信系統化探索能取得進展；結論只看證據，資訊不足就標明，遇阻便依新證據換路。
 
 ### 查看注入紀錄
 ```bash
@@ -47,21 +50,21 @@ ls ~/.claude/state/cheer_queue/
 
 | 欄位 | 預設 | 說明 |
 |------|------|------|
-| random_gate | 0.20 | 成功偵測後擲骰命中率 |
-| llm_improv_ratio | 0.30 | 30% 命中走 LLM 即興，其餘組合模板 |
-| easter_egg_ratio | 0.02 | 2% 機率附加英文彩蛋 |
+| random_gate | 0.10 | 成功偵測後擲骰命中率 |
+| llm_improv_ratio | 0 | 二次 LLM 生成預設關閉 |
+| easter_egg_ratio | 0 | 英文彩蛋預設關閉 |
 | force_floor_hours | 24 | 24h 無注入則 SessionStart 強制補一次 |
-| daily_token_budget | 500 | 每日注入 token 上限 |
-| max_injection_tokens | 50 | 單次注入硬截斷上限 |
+| daily_token_budget | 96 | 每日注入 token 上限 |
+| max_injection_tokens | 32 | 含前綴的單次完整 payload 上限 |
 | burst_window_hours | 2 | 密度衰減視窗 |
 | burst_threshold_count | 3 | 視窗內超過幾次觸發 gate 減半 |
 | burst_gate_multiplier | 0.5 | 觸發後 random_gate 乘此倍數 |
-| llm_model_chain | [nemotron-70b, nemotron-253b] | OpenRouter 免費模型 fallback |
+| llm_model_chain | [openrouter/free] | 啟用 LLM 時的 OpenRouter 路由 |
 | llm_timeout_ms | 4000 | LLM 超時退回模板 |
 
 ## 四層注入 Tier
 
-- **Tier 1**：本 session UserPromptSubmit 消費 pending（主線）
+- **Tier 1**：本 session PreToolUse／BeforeAgent 消費 pending（主線）
 - **Tier 2**：新 session SessionStart 消費 orphan（跨 session 兜底）
 - **Tier 4**：24h 無注入 → SessionStart 強制 general 鼓勵（地板保底）
 
