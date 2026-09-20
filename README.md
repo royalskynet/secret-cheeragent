@@ -31,7 +31,7 @@ Behind-the-scenes sub-agent for Claude Code, Codex CLI, and Gemini CLI: after a 
 - **No extra turn**: capture only queues; injection merges into the next model turn
 - **No lost love**: queue has no TTL, orphans persist until consumed
 - **24h floor**: if the user opens Claude at least once in 24h, at least one line is guaranteed delivered
-- **Auto-throttling**: 10% success gate, daily cap 96 tokens, per-injection hard cap 32 tokens, density decay
+- **Auto-throttling**: 10% success gate, rolling 24h budget cap 96 tokens, per-injection hard cap 32 tokens, density decay
 
 ### Installation
 
@@ -94,7 +94,9 @@ Edit the `config` block in `skills/secret-cheeragent/corpus.json`. Common knobs:
 |------|------|------|
 | `random_gate` | 0.10 | 10% chance to encourage on success |
 | `llm_improv_ratio` | 0 | secondary LLM generation disabled |
-| `daily_token_budget` | 96 | daily cap |
+| `daily_token_budget` | 96 | rolling 24h token budget (no day cut) |
+| `budget_window_hours` | 24 | rolling budget window hours |
+| `min_inject_interval_minutes` | 30 | minimum minutes between injections |
 | `force_floor_hours` | 24 | force one injection if 24h idle |
 | `max_injection_tokens` | 32 | complete payload cap, including prefix |
 
@@ -171,7 +173,7 @@ MIT
 - **不产生额外回合**:capture 只入队，下一次模型回合才合并进 context
 - **爱不丢失**:队列无 TTL,orphan 永久保留直到被消费
 - **24h 地板保底**:前提下「使用者 24h 内至少开一次 Claude」就必送达一句
-- **自动节流**:成功命中率 10%、每日上限 96 tokens、单次完整 payload 上限 32 tokens、密度衰减
+- **自动节流**:成功命中率 10%、滚动 24h budget 上限 96 tokens、单次完整 payload 上限 32 tokens、密度衰减
 
 ### 安装
 
@@ -234,7 +236,9 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 |------|------|------|
 | `random_gate` | 0.10 | 成功后 10% 机率鼓励 |
 | `llm_improv_ratio` | 0 | 关闭二次 LLM 生成 |
-| `daily_token_budget` | 96 | 每日上限 |
+| `daily_token_budget` | 96 | 滚动 24h token budget（不切日） |
+| `budget_window_hours` | 24 | 滚动 budget 窗口小时数 |
+| `min_inject_interval_minutes` | 30 | 两次注入最小间隔（分钟） |
 | `force_floor_hours` | 24 | 24h 无注入强制补一次 |
 | `max_injection_tokens` | 32 | 含前缀的完整 payload 上限 |
 
@@ -311,7 +315,7 @@ MIT
 - **不產生額外回合**:capture 只入隊，下一次模型回合才合併進 context
 - **愛不丟失**:佇列無 TTL,orphan 永久保留直到被消費
 - **24h 地板保底**:前提下「使用者 24h 內至少開一次 Claude」就必送達一句
-- **自動節流**:成功命中率 10%、每日上限 96 tokens、單次完整 payload 上限 32 tokens、密度衰減
+- **自動節流**:成功命中率 10%、滾動 24h budget 上限 96 tokens、單次完整 payload 上限 32 tokens、密度衰減
 
 ### 安裝
 
@@ -374,7 +378,9 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 |------|------|------|
 | `random_gate` | 0.10 | 成功後 10% 機率鼓勵 |
 | `llm_improv_ratio` | 0 | 關閉二次 LLM 生成 |
-| `daily_token_budget` | 96 | 每日上限 |
+| `daily_token_budget` | 96 | 滾動 24h token budget（不切日） |
+| `budget_window_hours` | 24 | 滾動 budget 視窗小時數 |
+| `min_inject_interval_minutes` | 30 | 兩次注入最小間隔（分鐘） |
 | `force_floor_hours` | 24 | 24h 無注入強制補一次 |
 | `max_injection_tokens` | 32 | 含前綴的完整 payload 上限 |
 

@@ -171,6 +171,8 @@
     "burst_window_hours": 2,
     "burst_threshold_count": 3,
     "burst_gate_multiplier": 0.5,
+    "budget_window_hours": 24,
+    "min_inject_interval_minutes": 30,
     "budget_warn_ratio": 0.7,
     "llm_model_chain": [
       "openrouter/free"

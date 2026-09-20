@@ -15,8 +15,8 @@ description: 秘密應援團——管理主 agent 完成任務時的隱形鼓勵
 - `0.05`（更稀罕）
 - `0.40`（熱情）
 
-### 調整每日 token budget
-修改 `config.daily_token_budget`（預設 96）。超出後當日剩餘注入自動 skip，佇列保留隔日消費。
+### 調整滾動 token budget
+修改 `config.daily_token_budget`（預設 96）。超出後窗口內剩餘注入自動 skip，佇列保留消費。此為滾動 24h budget（不切日）。
 
 ### 暫停 / 啟用
 - 暫停：在 Claude Code settings.json 或 plugin.json 把 hook 條目註解；或 `chmod -x` hooks/*.js
@@ -54,8 +54,10 @@ ls ~/.claude/state/cheer_queue/
 | llm_improv_ratio | 0 | 二次 LLM 生成預設關閉 |
 | easter_egg_ratio | 0 | 英文彩蛋預設關閉 |
 | force_floor_hours | 24 | 24h 無注入則 SessionStart 強制補一次 |
-| daily_token_budget | 96 | 每日注入 token 上限 |
+| daily_token_budget | 96 | 滾動 24h token budget（不切日） |
 | max_injection_tokens | 32 | 含前綴的單次完整 payload 上限 |
+| budget_window_hours | 24 | 滾動 budget 視窗小時數 |
+| min_inject_interval_minutes | 30 | 兩次注入最小間隔（分鐘） |
 | burst_window_hours | 2 | 密度衰減視窗 |
 | burst_threshold_count | 3 | 視窗內超過幾次觸發 gate 減半 |
 | burst_gate_multiplier | 0.5 | 觸發後 random_gate 乘此倍數 |
