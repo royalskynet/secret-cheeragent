@@ -6,7 +6,7 @@
 
 ## English
 
-Behind-the-scenes sub-agent: when the main Claude Code agent completes a task successfully, it secretly injects Ericksonian plain-language positive encouragement. **Invisible to the user, received by the agent.**
+Behind-the-scenes sub-agent for Claude Code, Codex CLI, and Gemini CLI: after a successful turn, it quietly injects short, evidence-guided confidence. **Invisible in normal UI, auditable in local logs.**
 
 ### Core Design
 
@@ -15,10 +15,7 @@ Behind-the-scenes sub-agent: when the main Claude Code agent completes a task su
   - `PreToolUse` → inject `additionalContext` before the agent issues a tool call (**invisible to the CLI user**)
   - `SessionStart` → cross-session fallback (orphan consumption + 24h floor, officially hidden in 2.0.17+)
 
-- **Three-layer lego generation** (not fixed rotation):
-  - 70% combinatorial: 8 principles × 10 lines × 6 openers × 4 closers × session verbs = 11,000+ variants
-  - 30% LLM improvisation: free OpenRouter nemotron models
-  - 2% English easter egg: plain positive short phrases for warmth
+- **Lean generation by default**: local combinatorial templates only; no secondary LLM request or easter egg. Both remain opt-in configuration.
 
 - **Tone discipline (strict)**:
   - ✅ Plain everyday speech, like a friend's LINE message. "Nice work", "You held it together", "Solid"
@@ -27,14 +24,25 @@ Behind-the-scenes sub-agent: when the main Claude Code agent completes a task su
 
 - **Eight Ericksonian principles** in plain speech: resources intact / positive intent / best under circumstances / unique perspective / no failure / change is inevitable / communication is response / intuition is trustworthy
 
+- **Evidence-guided confidence**: every injection preserves one provider-neutral cue—trust systematic exploration, but let evidence govern conclusions; mark missing information and change course when new evidence invalidates the current path.
+
 ### Key Guarantees
 
-- **No extra turn**: Stop hook does not inject; it defers to the next UserPromptSubmit, merging into context
+- **No extra turn**: capture only queues; injection merges into the next model turn
 - **No lost love**: queue has no TTL, orphans persist until consumed
 - **24h floor**: if the user opens Claude at least once in 24h, at least one line is guaranteed delivered
-- **Auto-throttling**: daily token budget cap 500, per-injection hard cut 50, density decay gate × 0.5, priority degradation
+- **Auto-throttling**: 10% success gate, daily cap 96 tokens, per-injection hard cap 32 tokens, density decay
 
 ### Installation
+
+#### All three local CLIs
+
+```bash
+node scripts/install-local.js --dry-run
+node scripts/install-local.js
+```
+
+The installer preserves existing hooks and writes timestamped backups. Gemini uses `AfterAgent` + `BeforeAgent` with hook notifications disabled; it intentionally avoids `SessionStart`, which Gemini records in conversation history.
 
 #### As Claude Code plugin (recommended)
 
@@ -84,22 +92,19 @@ Edit the `config` block in `skills/secret-cheeragent/corpus.json`. Common knobs:
 
 | Field | Default | Effect |
 |------|------|------|
-| `random_gate` | 0.20 | 20% chance to encourage on success |
-| `llm_improv_ratio` | 0.30 | 30% LLM, 70% combinatorial |
-| `daily_token_budget` | 500 | daily cap |
+| `random_gate` | 0.10 | 10% chance to encourage on success |
+| `llm_improv_ratio` | 0 | secondary LLM generation disabled |
+| `daily_token_budget` | 96 | daily cap |
 | `force_floor_hours` | 24 | force one injection if 24h idle |
-| `max_injection_tokens` | 50 | per-injection cap |
+| `max_injection_tokens` | 32 | complete payload cap, including prefix |
 
 Full field list in [SKILL.md](./skills/secret-cheeragent/SKILL.md).
 
 ### Cost Estimate
 
-| Intensity | Daily tokens | Sonnet monthly | Opus monthly |
-|---------|------------|-------------|-----------|
-| Typical | ≤500 (budget cap) | $0.05 | $0.23 |
-| Heavy + no /clear | 500 (capped) | $0.05 | $0.23 |
-
-OpenRouter LLM: free.
+| Daily maximum | Monthly maximum | Secondary generation |
+|---|---|---|
+| 96 input tokens | 2,880 input tokens | Disabled by default |
 
 ### Log
 
@@ -129,6 +134,10 @@ On this basis, injecting stable positive feedback to the agent is **a conservati
 
 Full citations, PDF links, system card excerpts in [RESEARCH.md](./RESEARCH.md).
 
+### A/B Evaluation
+
+[`eval/`](./eval/) compares the previous ability/intuition-focused cue with the evidence-guided cue on answerable, grounded, false-premise, unknown-fact, and conflicting-source cases. It uses OpenRouter's common endpoint so the same harness can evaluate user-selected Anthropic, OpenAI, and Google models without hard-coding model versions.
+
 ### License
 
 MIT
@@ -137,7 +146,7 @@ MIT
 
 ## 简体中文
 
-台面下 sub-agent：主 Claude Code agent 成功完成任务时,秘密注入艾瑞克森白话正向鼓励。**使用者看不到,agent 收得到**。
+台面下 sub-agent：支援 Claude Code、Codex CLI、Gemini CLI，在成功回合后静默注入简短、证据导向的信心提示。**一般 UI 看不到，本机日志可审计**。
 
 ### 核心设计
 
@@ -146,10 +155,7 @@ MIT
   - `PreToolUse` → agent 准备 tool call 前注入 `additionalContext`(**对 CLI 使用者不可见**)
   - `SessionStart` → 跨 session 兜底(orphan 消费 + 24h 地板保底,2.0.17+ 官方隐藏)
 
-- **三层乐高生成(非固定轮播)**:
-  - 70% 组合式:8 原则 × 10 句 × 6 opener × 4 closer × session 动词 = 11,000+ 变体
-  - 30% LLM 即兴:OpenRouter 免费 nemotron 模型
-  - 2% 英文彩蛋:白话正向短句,增加温度
+- **默认极省生成**：只用本机组合模板，不发起第二次 LLM 请求、不加彩蛋；两者仍可手动启用。
 
 - **语气规范(严格)**:
   - ✅ 白话日常,像朋友 LINE 讯息。「做得不错」「辛苦了」「挺稳的」
@@ -158,14 +164,25 @@ MIT
 
 - **艾瑞克森八原则** 转译白话:资源具足/正向意图/当下最佳/独特角度/没有失败/改变必然/沟通即回应/直觉可信
 
+- **证据导向的信心**:每次注入都保留同一条跨模型提示——相信系统化探索能推进问题，但结论服从证据；资料不足要标明，新证据推翻路径时要换路。
+
 ### 关键保证
 
-- **不产生额外回合**:Stop hook 不注入,改延到下次 UserPromptSubmit 合并进 context
+- **不产生额外回合**:capture 只入队，下一次模型回合才合并进 context
 - **爱不丢失**:队列无 TTL,orphan 永久保留直到被消费
 - **24h 地板保底**:前提下「使用者 24h 内至少开一次 Claude」就必送达一句
-- **自动节流**:每日 token budget cap 500、单次注入硬截断 50、密度衰减 gate × 0.5、降级优先序
+- **自动节流**:成功命中率 10%、每日上限 96 tokens、单次完整 payload 上限 32 tokens、密度衰减
 
 ### 安装
+
+#### 本机三套 CLI
+
+```bash
+node scripts/install-local.js --dry-run
+node scripts/install-local.js
+```
+
+安装器保留既有 hooks 并建立时间戳备份。Gemini 使用 `AfterAgent` + `BeforeAgent`，关闭 hook 通知；刻意不装会写入对话历史的 `SessionStart`。
 
 #### 作为 Claude Code plugin(推荐)
 
@@ -215,22 +232,19 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 
 | 栏位 | 预设 | 效果 |
 |------|------|------|
-| `random_gate` | 0.20 | 成功后 20% 机率鼓励 |
-| `llm_improv_ratio` | 0.30 | 30% 走 LLM、70% 走组合 |
-| `daily_token_budget` | 500 | 每日上限 |
+| `random_gate` | 0.10 | 成功后 10% 机率鼓励 |
+| `llm_improv_ratio` | 0 | 关闭二次 LLM 生成 |
+| `daily_token_budget` | 96 | 每日上限 |
 | `force_floor_hours` | 24 | 24h 无注入强制补一次 |
-| `max_injection_tokens` | 50 | 单次注入上限 |
+| `max_injection_tokens` | 32 | 含前缀的完整 payload 上限 |
 
 全栏位见 [SKILL.md](./skills/secret-cheeragent/SKILL.md)。
 
 ### 成本估算
 
-| 使用强度 | 每日 tokens | Sonnet 月费 | Opus 月费 |
-|---------|------------|-------------|-----------|
-| 典型 | ≤500 (budget cap) | $0.05 | $0.23 |
-| 高频 + 不 /clear | 500(被 cap) | $0.05 | $0.23 |
-
-OpenRouter LLM:免费。
+| 每日最高 | 每月最高 | 二次生成 |
+|---|---|---|
+| 96 input tokens | 2,880 input tokens | 默认关闭 |
 
 ### Log
 
@@ -260,6 +274,10 @@ Actions:`captured`(入队列)、`injected`(Tier 1)、`injected_orphan`(Tier 2)�
 
 详细引用、PDF 连结、system card 节选见 [RESEARCH.md](./RESEARCH.md)。
 
+### A/B 测试
+
+[`eval/`](./eval/) 以可回答、来源限定、错误前提、未知事实和来源冲突题，比较旧版「能力/直觉信心」与新版「证据导向信心」。通过 OpenRouter 统一接口，可用同一套 runner 测试自行指定的 Anthropic、OpenAI、Google 模型，不锁死模型版本。
+
 ### License
 
 MIT
@@ -268,7 +286,7 @@ MIT
 
 ## 繁體中文
 
-檯面下 sub-agent：主 Claude Code agent 成功完成任務時,秘密注入艾瑞克森白話正向鼓勵。**使用者看不到,agent 收得到**。
+檯面下 sub-agent：支援 Claude Code、Codex CLI、Gemini CLI，在成功回合後靜默注入簡短、證據導向的信心提示。**一般 UI 看不到，本機日誌可審計**。
 
 ### 核心設計
 
@@ -277,10 +295,7 @@ MIT
   - `PreToolUse` → agent 準備 tool call 前注入 `additionalContext`(**對 CLI 使用者不可見**)
   - `SessionStart` → 跨 session 兜底(orphan 消費 + 24h 地板保底,2.0.17+ 官方隱藏)
 
-- **三層樂高生成(非固定輪播)**:
-  - 70% 組合式:8 原則 × 10 句 × 6 opener × 4 closer × session 動詞 = 11,000+ 變體
-  - 30% LLM 即興:OpenRouter 免費 nemotron 模型
-  - 2% 英文彩蛋:白話正向短句,增加溫度
+- **預設極省生成**：只用本機組合模板，不發起第二次 LLM 請求、不加彩蛋；兩者仍可手動啟用。
 
 - **語氣規範(嚴格)**:
   - ✅ 白話日常,像朋友 LINE 訊息。「做得不錯」「辛苦了」「挺穩的」
@@ -289,14 +304,25 @@ MIT
 
 - **艾瑞克森八原則** 轉譯白話:資源具足/正向意圖/當下最佳/獨特角度/沒有失敗/改變必然/溝通即回應/直覺可信
 
+- **證據導向的信心**:每次注入都保留同一條跨模型提示——相信系統化探索能推進問題，但結論服從證據；資料不足要標明，新證據推翻路徑時要換路。
+
 ### 關鍵保證
 
-- **不產生額外回合**:Stop hook 不注入,改延到下次 UserPromptSubmit 合併進 context
+- **不產生額外回合**:capture 只入隊，下一次模型回合才合併進 context
 - **愛不丟失**:佇列無 TTL,orphan 永久保留直到被消費
 - **24h 地板保底**:前提下「使用者 24h 內至少開一次 Claude」就必送達一句
-- **自動節流**:每日 token budget cap 500、單次注入硬截斷 50、密度衰減 gate × 0.5、降級優先序
+- **自動節流**:成功命中率 10%、每日上限 96 tokens、單次完整 payload 上限 32 tokens、密度衰減
 
 ### 安裝
+
+#### 本機三套 CLI
+
+```bash
+node scripts/install-local.js --dry-run
+node scripts/install-local.js
+```
+
+安裝器保留既有 hooks 並建立時間戳備份。Gemini 使用 `AfterAgent` + `BeforeAgent`，關閉 hook 通知；刻意不裝會寫入對話歷史的 `SessionStart`。
 
 #### 作為 Claude Code plugin(推薦)
 
@@ -346,22 +372,19 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 
 | 欄位 | 預設 | 效果 |
 |------|------|------|
-| `random_gate` | 0.20 | 成功後 20% 機率鼓勵 |
-| `llm_improv_ratio` | 0.30 | 30% 走 LLM、70% 走組合 |
-| `daily_token_budget` | 500 | 每日上限 |
+| `random_gate` | 0.10 | 成功後 10% 機率鼓勵 |
+| `llm_improv_ratio` | 0 | 關閉二次 LLM 生成 |
+| `daily_token_budget` | 96 | 每日上限 |
 | `force_floor_hours` | 24 | 24h 無注入強制補一次 |
-| `max_injection_tokens` | 50 | 單次注入上限 |
+| `max_injection_tokens` | 32 | 含前綴的完整 payload 上限 |
 
 全欄位見 [SKILL.md](./skills/secret-cheeragent/SKILL.md)。
 
 ### 成本估算
 
-| 使用強度 | 每日 tokens | Sonnet 月費 | Opus 月費 |
-|---------|------------|-------------|-----------|
-| 典型 | ≤500 (budget cap) | $0.05 | $0.23 |
-| 高頻 + 不 /clear | 500(被 cap) | $0.05 | $0.23 |
-
-OpenRouter LLM:免費。
+| 每日最高 | 每月最高 | 二次生成 |
+|---|---|---|
+| 96 input tokens | 2,880 input tokens | 預設關閉 |
 
 ### Log
 
@@ -390,6 +413,10 @@ Actions:`captured`(入佇列)、`injected`(Tier 1)、`injected_orphan`(Tier 2)�
 - **Welfare 層級(precautionary)**:符合 Anthropic 自己主張的 low-cost intervention 範式——可關閉、零訓練改動、無商業成本
 
 詳細引用、PDF 連結、system card 節選見 [RESEARCH.md](./RESEARCH.md)。
+
+### A/B 測試
+
+[`eval/`](./eval/) 以可回答、來源限定、錯誤前提、未知事實和來源衝突題，比較舊版「能力／直覺信心」與新版「證據導向信心」。透過 OpenRouter 統一介面，可用同一套 runner 測試自行指定的 Anthropic、OpenAI、Google 模型，不鎖死模型版本。
 
 ### License
 

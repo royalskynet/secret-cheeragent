@@ -11,10 +11,17 @@ function readStdin() {
   return new Promise(resolve => {
     let data = '';
     if (process.stdin.isTTY) return resolve('');
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve(data);
+    };
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', chunk => { data += chunk; });
-    process.stdin.on('end', () => resolve(data));
-    setTimeout(() => resolve(data), 1500);
+    process.stdin.on('end', done);
+    const timer = setTimeout(done, 1500);
+    timer.unref();
   });
 }
 
@@ -26,13 +33,21 @@ async function main() {
     const payload = raw ? JSON.parse(raw) : {};
     const sessionId = payload.session_id || payload.sessionId || 'unknown';
     const transcriptPath = payload.transcript_path || payload.transcriptPath;
+    const directResponse = payload.prompt_response;
 
-    if (!transcriptPath) {
+    if (!transcriptPath && typeof directResponse !== 'string') {
       log({ action: 'skipped_no_transcript_path', session_id: sessionId });
       return silent();
     }
 
-    const entries = readTranscript(transcriptPath, 20);
+    // Gemini AfterAgent provides the prompt/response directly. Prefer that
+    // stable schema over parsing its implementation-specific transcript.
+    const entries = typeof directResponse === 'string'
+      ? [
+          { role: 'user', content: payload.prompt || '' },
+          { role: 'assistant', content: directResponse }
+        ]
+      : readTranscript(transcriptPath, 20);
     const detection = detectSuccess(entries);
     if (!detection.ok) {
       log({ action: `skipped_${detection.reason}`, session_id: sessionId });
@@ -66,6 +81,17 @@ async function main() {
     };
 
     const filepath = enqueue(ingredients);
+
+    if (mode === 'llm') {
+      const { spawn } = require('child_process');
+      const workerPath = require('path').join(__dirname, 'pregen_worker.js');
+      const child = spawn(process.execPath, [workerPath, filepath], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      child.unref();
+    }
+
     log({
       action: 'captured',
       session_id: sessionId,

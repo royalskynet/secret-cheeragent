@@ -35,6 +35,12 @@
 ### Tier 4（24h 地板）→ `SessionStart`
 - 同 Tier 2 路徑，只在沒 orphan 時用 floor 邏輯補一次
 
+### Gemini CLI → `AfterAgent` + `BeforeAgent`
+- `AfterAgent` 讀取官方提供的 `prompt_response`，只排隊、不觸發重試
+- 下一次 `BeforeAgent` 以 `additionalContext` 靜默注入，並設定 `hooksConfig.notifications=false`
+- 不使用 Gemini `SessionStart`：官方規格會把它加入對話歷史，無法滿足 UI 完全無感
+- Codex CLI 沿用 `Stop` + `PreToolUse` + `SessionStart`；不輸出 `systemMessage`
+
 ### 廢棄的 `UserPromptSubmit` 條目
 - 已從 `plugin.json`、`settings.json`、本機 symlink 移除
 - 原因：additionalContext 必然 surface，無法規避

@@ -12,10 +12,17 @@ function readStdin() {
   return new Promise(resolve => {
     let data = '';
     if (process.stdin.isTTY) return resolve('');
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve(data);
+    };
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', chunk => { data += chunk; });
-    process.stdin.on('end', () => resolve(data));
-    setTimeout(() => resolve(data), 1500);
+    process.stdin.on('end', done);
+    const timer = setTimeout(done, 1500);
+    timer.unref();
   });
 }
 
@@ -37,7 +44,7 @@ function emitContext(text) {
 }
 
 async function handleOrphan(orphan, sessionId) {
-  const budgetCheck = canInject(60, 2);
+  const budgetCheck = canInject(getConfig().max_injection_tokens, 2);
   if (!budgetCheck.ok) {
     log({
       action: `skipped_${budgetCheck.reason}`,
@@ -77,7 +84,7 @@ async function handleFloor(sessionId) {
     return silent();
   }
 
-  const budgetCheck = canInject(60, 4);
+  const budgetCheck = canInject(cfg.max_injection_tokens, 4);
   if (!budgetCheck.ok) {
     log({
       action: `skipped_${budgetCheck.reason}`,

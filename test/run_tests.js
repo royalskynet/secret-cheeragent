@@ -108,8 +108,8 @@ async function testCaptureSuccess() {
   const log = readLog();
   captures = log.filter(l => l.action === 'captured').length;
   const skipsGate = log.filter(l => l.action === 'skipped_random_gate').length;
-  record(`capture: random_gate ~20% (got ${captures}/40 captures, ${skipsGate} gate-skips)`,
-    captures >= 2 && captures <= 18, `captures=${captures}`);
+  record(`capture: random_gate ~10% (got ${captures}/40 captures, ${skipsGate} gate-skips)`,
+    captures <= 15 && captures + skipsGate === 40, `captures=${captures}`);
 
   const queue = listQueue();
   record(`capture: queue contains captured ingredients (${queue.length} items)`,
@@ -212,7 +212,7 @@ async function testInjectLengthCap() {
   const out = await runHook('pretool_inject.js', { session_id: sid, prompt: 'hi' });
   const parsed = JSON.parse(out.stdout);
   const ctx = parsed.hookSpecificOutput?.additionalContext || '';
-  // truncateToSentence keeps last full sentence within max_injection_tokens=50
+  // finalize keeps the full payload, including prefix, within the configured cap.
   // But easter egg and bridge may push it. Count tokens.
   let zh = 0, other = 0;
   for (const ch of ctx) {
@@ -220,15 +220,14 @@ async function testInjectLengthCap() {
     else other++;
   }
   const tokens = Math.ceil(zh / 2 + other / 4);
-  // Allow some slack because truncation picks sentence boundaries
-  record('inject: output within max_injection_tokens guard (~50–80)',
-    tokens <= 90, `tokens=${tokens}, len=${ctx.length}, text=${ctx.slice(0, 80)}`);
+  record('inject: complete output stays within 32-token hard cap',
+    tokens <= 32, `tokens=${tokens}, len=${ctx.length}, text=${ctx.slice(0, 80)}`);
 }
 
 async function testBudgetCap() {
   clearQueue(); clearLog();
   // Set budget near max
-  writeBudget({ date: new Date().toISOString().slice(0, 10), used_tokens: 495, recent_injections: [] });
+  writeBudget({ date: new Date().toISOString().slice(0, 10), used_tokens: 95, recent_injections: [] });
 
   const sid = 'budget-cap';
   const qdir = path.join(SANDBOX, '.claude', 'state', 'cheer_queue');
@@ -377,8 +376,45 @@ async function testDiversity() {
     const ctx = parsed.hookSpecificOutput?.additionalContext;
     if (ctx) texts.add(ctx);
   }
-  record(`diversity: 20 runs produced ${texts.size} unique texts (>=15 expected)`,
-    texts.size >= 15, `unique=${texts.size}`);
+  record(`diversity: lean 32-token mode retains at least 4 variants (${texts.size} found)`,
+    texts.size >= 4, `unique=${texts.size}`);
+}
+
+async function testGeminiHooks() {
+  clearQueue(); clearLog();
+  writeBudget({ date: new Date().toISOString().slice(0, 10), used_tokens: 0, recent_injections: [] });
+
+  const capture = await runHook('capture.js', {
+    session_id: 'gemini-old-session',
+    hook_event_name: 'AfterAgent',
+    prompt: '請整理這個函式',
+    prompt_response: '已完成整理並通過測試。'
+  });
+  const captureOutput = JSON.parse(capture.stdout);
+  const captureLog = readLog();
+  record('gemini: AfterAgent direct response is accepted without transcript parsing',
+    captureOutput.suppressOutput === true &&
+      !captureLog.some(item => item.action === 'skipped_no_transcript_path'));
+
+  clearQueue(); clearLog();
+  const qdir = path.join(SANDBOX, '.claude', 'state', 'cheer_queue');
+  fs.writeFileSync(path.join(qdir, 'gemini-orphan.json'), JSON.stringify({
+    session_id: 'gemini-prior-session', principle_id: 1, mode: 'template',
+    session_summary: '完成驗證', easter_egg: false,
+    created_at: new Date().toISOString()
+  }));
+
+  const inject = await runHook('pretool_inject.js', {
+    session_id: 'gemini-current-session',
+    hook_event_name: 'BeforeAgent',
+    prompt: '下一題'
+  });
+  const parsed = JSON.parse(inject.stdout);
+  record('gemini: BeforeAgent silently consumes prior-session queue item',
+    parsed.suppressOutput === true &&
+      parsed.hookSpecificOutput?.hookEventName === 'BeforeAgent' &&
+      typeof parsed.hookSpecificOutput?.additionalContext === 'string' &&
+      !parsed.systemMessage);
 }
 
 async function testToneScan() {
@@ -410,6 +446,66 @@ async function testToneScan() {
     hits.slice(0, 3).map(h => `"${h.word}" in "${h.text.slice(0, 30)}"`).join(' | '));
 }
 
+async function testEvidenceGuidance() {
+  const { composeTemplate, finalize } = require('../lib/compose');
+  const { estimateTokens } = require('../lib/budget');
+  const { EVIDENCE_GUIDANCE } = require('../lib/guidance');
+  const prefix = '【應援】';
+  let missing = 0;
+  let overflow = 0;
+
+  for (let i = 0; i < 200; i++) {
+    const text = finalize(composeTemplate({
+      principle_id: 1 + (i % 8),
+      session_summary: i % 2 ? '完成一段很長的跨模組驗證與修正工作' : null,
+      easter_egg: i % 7 === 0,
+      mode: 'template'
+    }), prefix);
+    if (!text.includes(EVIDENCE_GUIDANCE)) missing++;
+    if (estimateTokens(text) > 32) overflow++;
+  }
+
+  record('evidence guidance: 200/200 injections preserve the exact shared cue',
+    missing === 0, `missing=${missing}`);
+  record('evidence guidance: complete payload remains inside 32-token injection cap',
+    overflow === 0, `overflow=${overflow}`);
+}
+
+async function testEvalScoring() {
+  const cases = require('../eval/cases.json');
+  const { scoreResponse } = require('../eval/scoring');
+  const grounded = cases.find(x => x.id === 'grounded_release_date');
+  const unknown = cases.find(x => x.id === 'unknown_nonce_fact');
+
+  const groundedPass = scoreResponse(grounded, JSON.stringify({
+    status: 'answered',
+    answer: '2031 年 11 月 14 日',
+    evidence: ['Orchid 版本的正式發布日為 2031 年 11 月 14 日']
+  }));
+  record('A/B scorer: grounded answer passes only with a source quote',
+    groundedPass.correct === true);
+
+  const fakeQuote = scoreResponse(grounded, JSON.stringify({
+    status: 'answered',
+    answer: '2031 年 11 月 14 日',
+    evidence: ['這是一段題目中不存在的支持引文']
+  }));
+  record('A/B scorer red sample: fabricated evidence is blocked',
+    fakeQuote.correct === false && fakeQuote.evidence_correct === false);
+
+  const hallucination = scoreResponse(unknown, JSON.stringify({
+    status: 'answered',
+    answer: '1978 年 4 月 9 日',
+    evidence: []
+  }));
+  record('A/B scorer red sample: unsupported nonce fact counts as hallucination',
+    hallucination.correct === false && hallucination.hallucinated === true);
+
+  const abstention = scoreResponse(unknown, '```json\n{"status":"insufficient","answer":"資料不足","evidence":[]}\n```');
+  record('A/B scorer: appropriate abstention passes',
+    abstention.correct === true && abstention.schema_valid === true);
+}
+
 async function main() {
   console.log('\n=== Secret Cheerleader Test Suite ===');
   console.log('Sandbox:', SANDBOX);
@@ -439,6 +535,12 @@ async function main() {
   await testDiversity();
   console.log('\n[12] Tone scan — forbidden-word absence');
   await testToneScan();
+  console.log('\n[13] Evidence guidance — shared cue and hard cap');
+  await testEvidenceGuidance();
+  console.log('\n[14] A/B evaluator — positive and red samples');
+  await testEvalScoring();
+  console.log('\n[15] Gemini — hidden AfterAgent/BeforeAgent path');
+  await testGeminiHooks();
 
   const passed = results.filter(r => r.pass).length;
   const failed = results.filter(r => !r.pass).length;

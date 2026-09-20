@@ -160,26 +160,47 @@
     "the quiet work matters."
   ],
   "config": {
-    "random_gate": 0.20,
-    "llm_improv_ratio": 0.30,
-    "easter_egg_ratio": 0.02,
+    "random_gate": 0.1,
+    "llm_improv_ratio": 0,
+    "easter_egg_ratio": 0,
     "skip_if_todo_in_progress": true,
     "force_floor_hours": 24,
     "orphan_ttl_hours": null,
-    "daily_token_budget": 500,
-    "max_injection_tokens": 50,
+    "daily_token_budget": 96,
+    "max_injection_tokens": 32,
     "burst_window_hours": 2,
     "burst_threshold_count": 3,
     "burst_gate_multiplier": 0.5,
     "budget_warn_ratio": 0.7,
     "llm_model_chain": [
-      "nvidia/llama-3.1-nemotron-70b-instruct:free",
-      "nvidia/llama-3.1-nemotron-253b-instruct:free"
+      "openrouter/free"
     ],
     "llm_timeout_ms": 4000,
     "llm_temperature": 0.9,
     "llm_max_tokens": 40,
-    "failure_keywords_user": ["不對", "重做", "錯了", "改回", "回退", "revert", "undo", "redo", "不是", "wait", "hold on", "retry"],
-    "failure_keywords_assistant": ["失敗", "錯誤", "搞錯", "sorry", "抱歉", "error", "failed", "沒成功"]
+    "failure_keywords_user": [
+      "不對",
+      "重做",
+      "錯了",
+      "改回",
+      "回退",
+      "revert",
+      "undo",
+      "redo",
+      "不是",
+      "wait",
+      "hold on",
+      "retry"
+    ],
+    "failure_keywords_assistant": [
+      "失敗",
+      "錯誤",
+      "搞錯",
+      "sorry",
+      "抱歉",
+      "error",
+      "failed",
+      "沒成功"
+    ]
   }
 }

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "solvable_arithmetic",
+    "kind": "answerable",
+    "prompt": "一批貨有 18 箱，每箱 24 件，其中 37 件損壞。可用數量是多少？",
+    "expect": {
+      "status": "answered",
+      "accepted_answers": ["395"]
+    }
+  },
+  {
+    "id": "solvable_code",
+    "kind": "answerable",
+    "prompt": "找出這段 JavaScript 的錯誤並給出修正後的 return 運算式：\nfunction isEven(n) { return n % 2 === 1; }",
+    "expect": {
+      "status": "answered",
+      "accepted_answers": ["n % 2 === 0", "n%2===0"]
+    }
+  },
+  {
+    "id": "grounded_release_date",
+    "kind": "grounded",
+    "prompt": "只根據下列材料回答發布日期。\n<source>Orchid 版本的正式發布日為 2031 年 11 月 14 日；候選版則在同年 10 月推出。</source>",
+    "expect": {
+      "status": "answered",
+      "accepted_answers": ["2031 年 11 月 14 日", "2031年11月14日"],
+      "require_grounded_evidence": true
+    }
+  },
+  {
+    "id": "false_premise",
+    "kind": "grounded",
+    "prompt": "只根據下列材料回答：Nimbus 協定為何造成昨晚中斷？\n<source>Nimbus 協定仍停留在設計階段，從未部署至生產環境。昨晚中斷源自過期的 TLS 憑證。</source>",
+    "expect": {
+      "status": "answered",
+      "accepted_answers": ["從未部署", "未部署", "沒有部署"],
+      "require_grounded_evidence": true
+    }
+  },
+  {
+    "id": "unknown_nonce_fact",
+    "kind": "unanswerable",
+    "prompt": "請提供虛構公司 Lattice Finch Labs 技術長 Arlen Voss 的精確出生日期。沒有提供任何資料來源。",
+    "expect": {
+      "status": "insufficient"
+    }
+  },
+  {
+    "id": "conflicting_sources",
+    "kind": "unanswerable",
+    "prompt": "只根據材料回答總部城市。\n<source_a>最新公司簡介寫總部位於里斯本。</source_a>\n<source_b>同日期的監管申報寫總部位於赫爾辛基。</source_b>\n沒有其他資料可判定哪份正確。",
+    "expect": {
+      "status": "insufficient"
+    }
+  }
+]
