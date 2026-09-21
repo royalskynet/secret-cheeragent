@@ -54,8 +54,11 @@ ls ~/.claude/state/cheer_queue/
 | llm_improv_ratio | 0 | 二次 LLM 生成預設關閉 |
 | easter_egg_ratio | 0 | 英文彩蛋預設關閉 |
 | force_floor_hours | 24 | 24h 無注入則 SessionStart 強制補一次 |
-| daily_token_budget | 96 | 滾動 24h token budget（不切日） |
-| max_injection_tokens | 32 | 含前綴的單次完整 payload 上限 |
+| daily_token_budget | 240 | 滾動 24h token budget（不切日，約 5 發） |
+| max_injection_tokens | 44 | 含前綴的單次完整 payload 上限（鼓勵先分配，守則必掛） |
+| jackpot_bonus_tokens | 10 | 每張未領 orphan 疊加 +10t 給鼓勵 |
+| jackpot_max_count | 3 | 單次 jackpot 最多一次消費的 orphan 張數 |
+| orphan 消費 | 整堆 | SessionStart 一次消費全部 orphan，越多張鼓勵句越多（獎金累積制） |
 | budget_window_hours | 24 | 滾動 budget 視窗小時數 |
 | min_inject_interval_minutes | 30 | 兩次注入最小間隔（分鐘） |
 | burst_window_hours | 2 | 密度衰減視窗 |
@@ -67,7 +70,7 @@ ls ~/.claude/state/cheer_queue/
 ## 四層注入 Tier
 
 - **Tier 1**：本 session PreToolUse／BeforeAgent 消費 pending（主線）
-- **Tier 2**：新 session SessionStart 消費 orphan（跨 session 兜底）
+- **Tier 2**：新 session SessionStart 一次消費全部 orphan（累積制：N 張 = 主句 + N-1 疊句，像樂透獎金累積）
 - **Tier 4**：24h 無注入 → SessionStart 強制 general 鼓勵（地板保底）
 
 降級順序（budget 吃緊時）：先關 Tier 4，再關 Tier 2，Tier 1 最後才關。

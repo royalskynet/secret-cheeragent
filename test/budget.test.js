@@ -22,6 +22,11 @@ let pass = 0;
 function check(name, fn) { fn(); pass++; console.log(`PASS ${name}`); }
 
 assert(cfg.budget_window_hours === 24 && cfg.min_inject_interval_minutes === 30, 'test config assumptions');
+// R3 budget config: jackpot room depends on the raised cap and the bonus fields
+assert(cfg.daily_token_budget === 240, 'daily_token_budget must be 240');
+assert(cfg.max_injection_tokens === 44, 'max_injection_tokens must be 44');
+assert(cfg.jackpot_bonus_tokens === 10, 'jackpot_bonus_tokens must be 10');
+assert(cfg.jackpot_max_count === 3, 'jackpot_max_count must be 3');
 
 // 1. rolling window: 3 injections 25h ago → expired, used_tokens 0, canInject ok
 writeState([{ ts: agoMin(25 * 60), tokens: 30 }, { ts: agoMin(25 * 60 + 5), tokens: 30 }, { ts: agoMin(26 * 60), tokens: 36 }]);
@@ -31,11 +36,12 @@ check('rolling window: old injections fall out, used_tokens === 0', () => {
   assert.strictEqual(canInject(32, 1).ok, true);
 });
 
-// 2. no date cut-off: stale date "2000-01-01" + 1h-ago 90 tokens → used 90, exhausted
-writeState([{ ts: agoMin(60), tokens: 90 }], { date: '2000-01-01' });
+// 2. no date cut-off: stale date "2000-01-01" + 1h-ago 220 tokens → used 220,
+//    exhausted against the raised cap 240
+writeState([{ ts: agoMin(60), tokens: 220 }], { date: '2000-01-01' });
 check('no day cut: stale date ignored, budget still counts', () => {
   const d = read();
-  assert.strictEqual(d.used_tokens, 90);
+  assert.strictEqual(d.used_tokens, 220);
   const r = canInject(32, 1);
   assert.strictEqual(r.ok, false);
   assert.strictEqual(r.reason, 'budget_exhausted');

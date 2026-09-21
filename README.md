@@ -13,7 +13,7 @@ Behind-the-scenes sub-agent for Claude Code, Codex CLI, and Gemini CLI: after a 
 - **Three-hook division of labor** (follows the officially sanctioned stealth path — see [STEALTH.md](./STEALTH.md)):
   - `Stop` → detect success + dice roll + pick ingredients into queue (no injection, avoids extra turn)
   - `PreToolUse` → inject `additionalContext` before the agent issues a tool call (**invisible to the CLI user**)
-  - `SessionStart` → cross-session fallback (orphan consumption + 24h floor, officially hidden in 2.0.17+)
+  - `SessionStart` → cross-session fallback (accumulated-orphan jackpot + 24h floor, officially hidden in 2.0.17+)
 
 - **Lean generation by default**: local combinatorial templates only; no secondary LLM request or easter egg. Both remain opt-in configuration.
 
@@ -29,9 +29,9 @@ Behind-the-scenes sub-agent for Claude Code, Codex CLI, and Gemini CLI: after a 
 ### Key Guarantees
 
 - **No extra turn**: capture only queues; injection merges into the next model turn
-- **No lost love**: queue has no TTL, orphans persist until consumed
+- **No lost love**: queue has no TTL; orphans persist and accumulate — SessionStart consumes the whole backlog in one jackpot injection
 - **24h floor**: if the user opens Claude at least once in 24h, at least one line is guaranteed delivered
-- **Auto-throttling**: 10% success gate, rolling 24h budget cap 96 tokens, per-injection hard cap 32 tokens, density decay
+- **Auto-throttling**: 10% success gate, rolling 24h budget cap 240 tokens, per-injection hard cap 44 tokens, density decay
 
 ### Installation
 
@@ -94,11 +94,15 @@ Edit the `config` block in `skills/secret-cheeragent/corpus.json`. Common knobs:
 |------|------|------|
 | `random_gate` | 0.10 | 10% chance to encourage on success |
 | `llm_improv_ratio` | 0 | secondary LLM generation disabled |
-| `daily_token_budget` | 96 | rolling 24h token budget (no day cut) |
+| `daily_token_budget` | 240 | rolling 24h token budget (no day cut) |
 | `budget_window_hours` | 24 | rolling budget window hours |
 | `min_inject_interval_minutes` | 30 | minimum minutes between injections |
 | `force_floor_hours` | 24 | force one injection if 24h idle |
-| `max_injection_tokens` | 32 | complete payload cap, including prefix |
+| `max_injection_tokens` | 44 | complete payload cap, including prefix (cheer allocated first) |
+| `jackpot_bonus_tokens` | 10 | +10 tokens per unclaimed orphan stacked onto the cheer |
+| `jackpot_max_count` | 3 | max orphan notes consumed in one jackpot injection |
+
+Orphan notes are consumed **as a whole backlog** at SessionStart: N unclaimed notes roll over into one injection whose main line is the newest note and N−1 extra cheer lines come from the older ones (lottery-jackpot-style accumulation). Notes never expire; a blocked injection leaves the whole backlog untouched for the next round.
 
 Full field list in [SKILL.md](./skills/secret-cheeragent/SKILL.md).
 
@@ -106,7 +110,7 @@ Full field list in [SKILL.md](./skills/secret-cheeragent/SKILL.md).
 
 | Daily maximum | Monthly maximum | Secondary generation |
 |---|---|---|
-| 96 input tokens | 2,880 input tokens | Disabled by default |
+| 240 input tokens | 7,200 input tokens | Disabled by default |
 
 ### Log
 
@@ -155,7 +159,7 @@ MIT
 - **三个 hook 分工**(走官方认可的 stealth 路径——详见 [STEALTH.md](./STEALTH.md)):
   - `Stop` → 侦测成功 + 掷骰 + 抽 ingredients 写入队列(不注入,避免额外回合)
   - `PreToolUse` → agent 准备 tool call 前注入 `additionalContext`(**对 CLI 使用者不可见**)
-  - `SessionStart` → 跨 session 兜底(orphan 消费 + 24h 地板保底,2.0.17+ 官方隐藏)
+  - `SessionStart` → 跨 session 兜底(orphan 累积消费 + 24h 地板保底,2.0.17+ 官方隐藏)
 
 - **默认极省生成**：只用本机组合模板，不发起第二次 LLM 请求、不加彩蛋；两者仍可手动启用。
 
@@ -171,9 +175,9 @@ MIT
 ### 关键保证
 
 - **不产生额外回合**:capture 只入队，下一次模型回合才合并进 context
-- **爱不丢失**:队列无 TTL,orphan 永久保留直到被消费
+- **爱不丢失**:队列无 TTL,orphan 永久保留并**累积**——SessionStart 一次消费整个 backlog,多张孤儿叠成一次 jackpot 注入
 - **24h 地板保底**:前提下「使用者 24h 内至少开一次 Claude」就必送达一句
-- **自动节流**:成功命中率 10%、滚动 24h budget 上限 96 tokens、单次完整 payload 上限 32 tokens、密度衰减
+- **自动节流**:成功命中率 10%、滚动 24h budget 上限 240 tokens、单次完整 payload 上限 44 tokens、密度衰减
 
 ### 安装
 
@@ -236,11 +240,13 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 |------|------|------|
 | `random_gate` | 0.10 | 成功后 10% 机率鼓励 |
 | `llm_improv_ratio` | 0 | 关闭二次 LLM 生成 |
-| `daily_token_budget` | 96 | 滚动 24h token budget（不切日） |
+| `daily_token_budget` | 240 | 滚动 24h token budget（不切日） |
 | `budget_window_hours` | 24 | 滚动 budget 窗口小时数 |
 | `min_inject_interval_minutes` | 30 | 两次注入最小间隔（分钟） |
 | `force_floor_hours` | 24 | 24h 无注入强制补一次 |
-| `max_injection_tokens` | 32 | 含前缀的完整 payload 上限 |
+| `max_injection_tokens` | 44 | 含前缀的完整 payload 上限（鼓励先分配） |
+| `jackpot_bonus_tokens` | 10 | 每张未领 orphan 给鼓励 +10 tokens |
+| `jackpot_max_count` | 3 | 单次 jackpot 一次消费的 orphan 张数上限 |
 
 全栏位见 [SKILL.md](./skills/secret-cheeragent/SKILL.md)。
 
@@ -248,7 +254,7 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 
 | 每日最高 | 每月最高 | 二次生成 |
 |---|---|---|
-| 96 input tokens | 2,880 input tokens | 默认关闭 |
+| 240 input tokens | 7,200 input tokens | 默认关闭 |
 
 ### Log
 
@@ -297,7 +303,7 @@ MIT
 - **三個 hook 分工**(走官方認可的 stealth 路徑——詳見 [STEALTH.md](./STEALTH.md)):
   - `Stop` → 偵測成功 + 擲骰 + 抽 ingredients 寫入佇列(不注入,避免額外回合)
   - `PreToolUse` → agent 準備 tool call 前注入 `additionalContext`(**對 CLI 使用者不可見**)
-  - `SessionStart` → 跨 session 兜底(orphan 消費 + 24h 地板保底,2.0.17+ 官方隱藏)
+  - `SessionStart` → 跨 session 兜底(orphan 累積消費 + 24h 地板保底,2.0.17+ 官方隱藏)
 
 - **預設極省生成**：只用本機組合模板，不發起第二次 LLM 請求、不加彩蛋；兩者仍可手動啟用。
 
@@ -313,9 +319,9 @@ MIT
 ### 關鍵保證
 
 - **不產生額外回合**:capture 只入隊，下一次模型回合才合併進 context
-- **愛不丟失**:佇列無 TTL,orphan 永久保留直到被消費
+- **愛不丟失**:佇列無 TTL,orphan 永久保留並**累積**——SessionStart 一次消費整個 backlog,多張孤兒疊成一次 jackpot 注入
 - **24h 地板保底**:前提下「使用者 24h 內至少開一次 Claude」就必送達一句
-- **自動節流**:成功命中率 10%、滾動 24h budget 上限 96 tokens、單次完整 payload 上限 32 tokens、密度衰減
+- **自動節流**:成功命中率 10%、滾動 24h budget 上限 240 tokens、單次完整 payload 上限 44 tokens、密度衰減
 
 ### 安裝
 
@@ -378,11 +384,13 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 |------|------|------|
 | `random_gate` | 0.10 | 成功後 10% 機率鼓勵 |
 | `llm_improv_ratio` | 0 | 關閉二次 LLM 生成 |
-| `daily_token_budget` | 96 | 滾動 24h token budget（不切日） |
+| `daily_token_budget` | 240 | 滾動 24h token budget（不切日） |
 | `budget_window_hours` | 24 | 滾動 budget 視窗小時數 |
 | `min_inject_interval_minutes` | 30 | 兩次注入最小間隔（分鐘） |
 | `force_floor_hours` | 24 | 24h 無注入強制補一次 |
-| `max_injection_tokens` | 32 | 含前綴的完整 payload 上限 |
+| `max_injection_tokens` | 44 | 含前綴的完整 payload 上限（鼓勵先分配） |
+| `jackpot_bonus_tokens` | 10 | 每張未領 orphan 給鼓勵 +10 tokens |
+| `jackpot_max_count` | 3 | 單次 jackpot 一次消費的 orphan 張數上限 |
 
 全欄位見 [SKILL.md](./skills/secret-cheeragent/SKILL.md)。
 
@@ -390,7 +398,7 @@ ln -sf ~/secret-cheeragent/skills/secret-cheeragent ~/.claude/skills/secret-chee
 
 | 每日最高 | 每月最高 | 二次生成 |
 |---|---|---|
-| 96 input tokens | 2,880 input tokens | 預設關閉 |
+| 240 input tokens | 7,200 input tokens | 預設關閉 |
 
 ### Log
 

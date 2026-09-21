@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* SessionStart hook — secret-cheeragent orphan consumer + 24h floor (Tier 2 & Tier 4) */
 
-const { listOrphans, latest, remove } = require('../lib/queue');
+const { listOrphans, remove } = require('../lib/queue');
 const { log } = require('../lib/logger');
 const { canInject, recordInjection, estimateTokens } = require('../lib/budget');
 const { generateText } = require('../lib/generate');
@@ -43,30 +43,63 @@ function emitContext(text) {
   });
 }
 
-async function handleOrphan(orphan, sessionId) {
-  const budgetCheck = canInject(getConfig().max_injection_tokens, 2);
+async function handleOrphan(orphans, sessionId) {
+  const cfg = getConfig();
+  const jackpot = Math.min(orphans.length, cfg.jackpot_max_count ?? 3);
+  // main note is the newest; older ones stack as extra cheer lines
+  const newestFirst = [...orphans].sort((a, b) => b.mtime - a.mtime);
+  const newest = newestFirst[0];
+  const consumed = newestFirst.slice(0, jackpot);
+
+  const extraLines = jackpot - 1;
+  const maxTokens = cfg.max_injection_tokens + extraLines * (cfg.jackpot_bonus_tokens ?? 10);
+  const budgetCheck = canInject(maxTokens, 2);
   if (!budgetCheck.ok) {
+    // keep the WHOLE backlog untouched: blocking rolls the jackpot to next round
     log({
       action: `skipped_${budgetCheck.reason}`,
       session_id: sessionId,
       tier: 2,
-      note: 'orphan not consumed, kept in queue'
+      note: 'orphans not consumed, kept in queue',
+      jackpot
     });
     return silent();
   }
 
-  const { text, mode, latency_ms } = await generateText(orphan.data, '【應援・上一輪留給你】');
+  const prefix = jackpot >= 2
+    ? `【應援・累積 ${jackpot} 份】`
+    : '【應援・上一輪】';
+  const { text, mode, latency_ms } = await generateText(
+    newest.data,
+    prefix,
+    { maxTokens, extraLines }
+  );
+
+  if (text == null) {
+    // cheer-first failed: never inject a cue-only note (9278)
+    log({
+      action: 'skipped_cheer_budget_too_small',
+      session_id: sessionId,
+      tier: 2,
+      jackpot,
+      note: 'cheer could not fit, nothing consumed'
+    });
+    return silent();
+  }
+
   const tokens = estimateTokens(text);
 
   recordInjection(tokens, budgetCheck.data);
   updateLastInjected();
-  remove(orphan.filepath);
+  for (const o of consumed) remove(o.filepath);
 
   log({
     action: 'injected_orphan',
     session_id: sessionId,
     tier: 2,
-    original_session: orphan.data.session_id,
+    original_session: newest.data.session_id,
+    jackpot,
+    consumed: consumed.length,
     mode,
     tokens,
     latency_ms,
@@ -108,7 +141,7 @@ async function handleFloor(sessionId) {
 
   const { text, mode: usedMode, latency_ms } = await generateText(
     ingredients,
-    '【好久沒打招呼了，想跟你說聲辛苦了】'
+    '【應援・久違】'
   );
   const tokens = estimateTokens(text);
 
@@ -138,8 +171,7 @@ async function main() {
 
     const orphans = listOrphans(sessionId);
     if (orphans.length > 0) {
-      const chosen = latest(orphans);
-      return await handleOrphan(chosen, sessionId);
+      return await handleOrphan(orphans, sessionId);
     }
 
     return await handleFloor(sessionId);
