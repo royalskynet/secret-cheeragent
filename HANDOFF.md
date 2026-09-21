@@ -180,6 +180,8 @@ PASS jackpot capped at 3: 3 removed, 4 roll over
 2/2 assertions pass for queue-jackpot.test.js
 ```
 
+> 不要跑 `test/run_tests.js`。那是陳舊 harness，會噴 16 個假失敗，見 §7 缺陷一。
+
 **跑完必驗副作用**：`wc -l /Users/51mini/.claude/logs/cheerleader.log` 前後差值必須為 **0**
 （實測 8238 → 8238）。曾經漏掉這步，10 筆假紀錄進了生產 log 還把統計撐大 11 倍。
 
@@ -208,6 +210,18 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 ---
 
 ## 7. 待辦與已知缺陷
+
+### 待辦清單（2026-09-21 盤點，優先序）
+
+| # | 事項 | 動哪個檔 | 狀態 |
+|---|---|---|---|
+| 1 | 觀察真實 jackpot：下個新 session 開起來，查 log 有無 `jackpot: 3` | 只讀 `/Users/51mini/.claude/logs/cheerleader.log` | 等事件發生，不需改碼 |
+| 2 | 補 `finalize()` 回 null 的兩個缺漏檢查 | `/Users/51mini/secret-cheeragent/hooks/pretool_inject.js`、`hooks/sessionstart.js` 的 `forced_floor` 段 | 可直接做，修法見缺陷三 |
+| 3 | 處理陳舊 harness：更新或刪除 | `/Users/51mini/secret-cheeragent/test/run_tests.js` | 可直接做，判斷見缺陷一 |
+| 4 | hook 改指已 commit 的安裝副本 | `/Users/51mini/.claude/settings.json` 102/113/131 行 ＋ `scripts/install-local.js` | **使用者未決**，要動就開工單 |
+| 5 | `\|\|` → `??` 讓 `0` 能關閉最小間隔 | `/Users/51mini/secret-cheeragent/lib/budget.js` | **使用者未決**，一行改動 |
+
+第 4、5 項是使用者尚未拍板的設計取捨，不要自己決定就動；第 2、3 項屬於明確的缺漏，可逕行修補。
 
 ### 最優先：jackpot 尚未有真實世界證據
 
@@ -242,6 +256,11 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 另有一批 `captures=0` 是 `random_gate 0.1` 在 40 次抽樣下必然的統計噪音。
 **要嘛更新它、要嘛刪掉**，別讓它繼續發假警報。真正的驗收是 §5 那三個檔。
 
+建議刪掉而非修：它用 `HOME` 沙箱（不是 `CHEER_STATE_DIR`）自成一套隔離機制，
+30 個斷言裡含 `random_gate` 統計抽樣這種本質上會偶發紅字的設計，
+而 §5 那三個檔已經用純 `node:assert` 覆蓋了同樣的行為且斷言是決定性的。
+真要保留就得逐條重寫前綴、cap 44、jackpot 全吃三處預期值，並把擲骰類斷言改成注入固定種子。
+
 ### 缺陷二：hook 指向 git 工作區，子代理的中途狀態會即時生效
 
 `/Users/51mini/.claude/settings.json` 三行都指工作區。
@@ -268,7 +287,32 @@ if (text == null) { log({ action: 'skipped_cheer_budget_too_small', … }); retu
 不會 crash（`estimateTokens(null)` 回 0），但會：紙條被刪掉、記一筆 0 token 的 `injected`、
 `additionalContext` 送出 `null`。
 cap=44 時 `【應援】` 的 cheerBudget = 44-2-19-1 = 22 ≥ 8，所以**現在打不到**。
-一旦有人調小 `max_injection_tokens` 就會靜默吃掉紙條。加兩個 `if (text == null)` 就好。
+一旦有人調小 `max_injection_tokens` 就會靜默吃掉紙條。
+
+修法（兩處各插一段，插在 `const tokens = estimateTokens(text);` **之前**）：
+
+`hooks/pretool_inject.js` —— 注意這條路徑必須 **`return` 在 `remove(chosen.filepath)` 之前**，
+紙條要留在佇列裡下輪再試，不能吃掉：
+
+```js
+if (text == null) {
+  log({ action: 'skipped_cheer_budget_too_small', session_id: sessionId, tier,
+        note: 'item not consumed, kept in queue' });
+  return silent();
+}
+```
+
+`hooks/sessionstart.js` 的 `forced_floor` 段 —— 地板沒有佇列可留，只要不記 injection、不送 context：
+
+```js
+if (text == null) {
+  log({ action: 'skipped_cheer_budget_too_small', session_id: sessionId, tier: 4 });
+  return silent();
+}
+```
+
+改完加一條 `compose.test.js` 斷言：`finalize('x', '【應援】', { maxTokens: 24 })` 必須回 `null`
+（24-2-19-1 = 2 < 8），確認低 cap 下真的走 null 路徑。
 
 ### 缺陷四：`||` 讓 `0` 無法關閉最小間隔
 
