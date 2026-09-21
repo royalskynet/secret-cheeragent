@@ -62,6 +62,25 @@ check('interval passed: allows when last injection >= 30min ago', () => {
   assert.strictEqual(r.ok, true);
 });
 
+// 5. min_inject_interval_minutes: 0 must fully disable the gate (?? vs ||) —
+//    a 1-minute-ago injection still does not block, because 1 < 0 is false.
+//    cache-bust corpus & budget so canInject reads a patched 0-interval config
+writeState([{ ts: agoMin(1), tokens: 10 }]);
+{
+  const corpusPath = require.resolve('../lib/corpus');
+  const budgetPath = require.resolve('../lib/budget');
+  delete require.cache[corpusPath];
+  delete require.cache[budgetPath];
+  const corpusMod = require('../lib/corpus');
+  const baseCfg = corpusMod.getConfig();
+  corpusMod.getConfig = () => ({ ...baseCfg, min_inject_interval_minutes: 0 });
+  const fresh = require('../lib/budget');
+  check('min interval 0 disables the gate (recent injection not blocked)', () => {
+    assert.strictEqual(fresh.canInject(32, 1).ok, true);
+  });
+}
+
+
 // recordInjection round-trip: appends and derives used_tokens
 writeState([]);
 const recorded = recordInjection(16, { recent_injections: [] });
@@ -71,4 +90,4 @@ pass++;
 console.log('PASS recordInjection derives used_tokens');
 
 fs.rmSync(stateDir, { recursive: true, force: true });
-console.log(`\n${pass}/5 assertions pass for ${path.basename(__filename)}`);
+console.log(`\n${pass}/6 assertions pass for ${path.basename(__filename)}`);
