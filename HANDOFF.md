@@ -53,9 +53,8 @@ Claude Code plugin。主 agent 做完事情後，**偷偷**往它自己的 conte
 ### 測試
 
 - `/Users/51mini/secret-cheeragent/test/budget.test.js` — 5 斷言（滾動視窗、不切日、最小間隔、config 值）
-- `/Users/51mini/secret-cheeragent/test/compose.test.js` — 6 斷言（四種前綴下鼓勵都 ≥8t、守則必掛全文、200 次不截斷、疊句、無半形接縫＋去重、空鼓勵回 null）
+- `/Users/51mini/secret-cheeragent/test/compose.test.js` — 7 斷言（四種前綴下鼓勵都 ≥8t、守則必掛全文、200 次不截斷、疊句、無半形接縫＋去重、空鼓勵回 null、低 cap 回 null）
 - `/Users/51mini/secret-cheeragent/test/queue-jackpot.test.js` — 2 斷言（3 張一次吃完 `jackpot===3`、7 張封頂 3 剩 4）
-- `/Users/51mini/secret-cheeragent/test/run_tests.js` — **陳舊，別看它的紅字**（見 §7 缺陷一）
 
 ### 執行時檔案（不在 repo 內）
 
@@ -180,8 +179,6 @@ PASS jackpot capped at 3: 3 removed, 4 roll over
 2/2 assertions pass for queue-jackpot.test.js
 ```
 
-> 不要跑 `test/run_tests.js`。那是陳舊 harness，會噴 16 個假失敗，見 §7 缺陷一。
-
 **跑完必驗副作用**：`wc -l /Users/51mini/.claude/logs/cheerleader.log` 前後差值必須為 **0**
 （實測 8238 → 8238）。曾經漏掉這步，10 筆假紀錄進了生產 log 還把統計撐大 11 倍。
 
@@ -216,8 +213,8 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 | # | 事項 | 動哪個檔 | 狀態 |
 |---|---|---|---|
 | 1 | 觀察真實 jackpot：下個新 session 開起來，查 log 有無 `jackpot: 3` | 只讀 `/Users/51mini/.claude/logs/cheerleader.log` | 等事件發生，不需改碼 |
-| 2 | 補 `finalize()` 回 null 的兩個缺漏檢查 | `/Users/51mini/secret-cheeragent/hooks/pretool_inject.js`、`hooks/sessionstart.js` 的 `forced_floor` 段 | 可直接做，修法見缺陷三 |
-| 3 | 處理陳舊 harness：更新或刪除 | `/Users/51mini/secret-cheeragent/test/run_tests.js` | 可直接做，判斷見缺陷一 |
+| 2 | 補 `finalize()` 回 null 的兩個缺漏檢查 | `/Users/51mini/secret-cheeragent/hooks/pretool_inject.js`、`hooks/sessionstart.js` 的 `forced_floor` 段 | **已修**（683bca5），見缺陷三 |
+| 3 | 處理陳舊 harness：更新或刪除 | `/Users/51mini/secret-cheeragent/test/run_tests.js` | **已刪**，見缺陷一 |
 | 4 | hook 改指已 commit 的安裝副本 | `/Users/51mini/.claude/settings.json` 102/113/131 行 ＋ `scripts/install-local.js` | **使用者未決**，要動就開工單 |
 | 5 | `\|\|` → `??` 讓 `0` 能關閉最小間隔 | `/Users/51mini/secret-cheeragent/lib/budget.js` | **使用者未決**，一行改動 |
 
@@ -241,25 +238,19 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 
 ### 缺陷一：`test/run_tests.js` 陳舊，16/30 紅字是假警報
 
-那是改版前的舊 harness，斷言的是**已被刻意改掉**的行為：
+**已刪**（不再存在於 repo）。那是改版前的舊 harness，斷言的是已被刻意改掉的行為：
 
 ```
 - sessionstart: injects orphan with【應援・上一輪留給你】 prefix
-    :: 【應援・累積 3 份】欸，這次那段 已將 token 過期檢查從 < 改成 <=…
 - sessionstart: LIFO — newer orphan consumed, older preserved (愛不丟失)
-- evidence guidance: complete payload remains inside 32-token injection cap :: overflow=184
+- evidence guidance: complete payload remains inside 32-token injection cap
 - diversity: lean 32-token mode retains at least 4 variants
 ```
 
-前綴改了、LIFO 改成 jackpot 全吃、cap 從 32 改成 44 —— 這些「失敗」其實是新設計生效的證據
-（第一條甚至順手證明了 jackpot 會產出 `【應援・累積 3 份】`）。
-另有一批 `captures=0` 是 `random_gate 0.1` 在 40 次抽樣下必然的統計噪音。
-**要嘛更新它、要嘛刪掉**，別讓它繼續發假警報。真正的驗收是 §5 那三個檔。
-
-建議刪掉而非修：它用 `HOME` 沙箱（不是 `CHEER_STATE_DIR`）自成一套隔離機制，
-30 個斷言裡含 `random_gate` 統計抽樣這種本質上會偶發紅字的設計，
-而 §5 那三個檔已經用純 `node:assert` 覆蓋了同樣的行為且斷言是決定性的。
-真要保留就得逐條重寫前綴、cap 44、jackpot 全吃三處預期值，並把擲骰類斷言改成注入固定種子。
+前綴改了、LIFO 改成 jackpot 全吃、cap 從 32 改成 44 —— 這些本來就是新設計生效的證據；
+另有 `captures=0` 是 `random_gate 0.1` 在 40 次抽樣下的統計噪音。它用 `HOME` 沙箱自成一套
+隔離（非 `CHEER_STATE_DIR`），與現行三個測試檔機制不相容。已刪，不補替代測試——
+真正的驗收是 §5 那三個檔；`eval/scoring` 是唯一獨有覆蓋，而 `eval/` 全目錄禁改、不受影響。
 
 ### 缺陷二：hook 指向 git 工作區，子代理的中途狀態會即時生效
 
