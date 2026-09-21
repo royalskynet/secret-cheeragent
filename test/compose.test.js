@@ -104,4 +104,10 @@ check('empty cheer returns null, never a cue-only note', () => {
   assert.strictEqual(out, null);
 });
 
-console.log(`\n${pass}/6 assertions pass for ${path.basename(__filename)}`);
+// 7. low cap returns null even under the short prefix (24-2-19-1 = 2 < 8);
+//    guards against a future max_injection_tokens shrink silently eating notes
+check('low cap returns null under 【應援】 prefix (24-2-19-1 < 8)', () => {
+  assert.strictEqual(finalize('x', '【應援】', { maxTokens: 24 }), null);
+});
+
+console.log(`\n${pass}/7 assertions pass for ${path.basename(__filename)}`);

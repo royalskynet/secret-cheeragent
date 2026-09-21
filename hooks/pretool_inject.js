@@ -76,6 +76,11 @@ async function main() {
       mode = ingredients.mode === 'llm' ? 'template_fallback' : 'template';
     }
     const latency_ms = Date.now() - start;
+    if (text == null) {
+      log({ action: 'skipped_cheer_budget_too_small', session_id: sessionId, tier,
+            note: 'item not consumed, kept in queue' });
+      return silent();
+    }
     const tokens = estimateTokens(text);
 
     recordInjection(tokens, budgetCheck.data);

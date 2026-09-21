@@ -143,6 +143,10 @@ async function handleFloor(sessionId) {
     ingredients,
     '【應援・久違】'
   );
+  if (text == null) {
+    log({ action: 'skipped_cheer_budget_too_small', session_id: sessionId, tier: 4 });
+    return silent();
+  }
   const tokens = estimateTokens(text);
 
   recordInjection(tokens, budgetCheck.data);
