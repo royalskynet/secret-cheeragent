@@ -3,15 +3,19 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
 const homeDir = os.homedir();
 const dryRun = process.argv.includes('--dry-run');
+// hooks point at the committed install copy, not the git working tree, so
+// sub-agents' uncommitted mid-edit states never reach the live session (缺陷二)
+const installDir = '/Users/51mini/.local/share/secret-cheeragent';
 
 const commands = {
-  capture: `node ${path.join(projectRoot, 'hooks', 'capture.js')}`,
-  inject: `node ${path.join(projectRoot, 'hooks', 'pretool_inject.js')}`,
-  sessionStart: `node ${path.join(projectRoot, 'hooks', 'sessionstart.js')}`
+  capture: `node ${path.join(installDir, 'hooks', 'capture.js')}`,
+  inject: `node ${path.join(installDir, 'hooks', 'pretool_inject.js')}`,
+  sessionStart: `node ${path.join(installDir, 'hooks', 'sessionstart.js')}`
 };
 
 function readJson(filepath) {
@@ -62,6 +66,12 @@ function configure(name, filepath, definitions, mutate) {
   mutate?.(settings);
   const changed = writeJson(filepath, settings);
   console.log(`${name}: ${changed ? (dryRun ? '將更新' : '已更新') : '已是最新'}，新增 hooks=${added}`);
+}
+
+// sync the committed install copy first so the hook commands below resolve;
+// skip on --dry-run (dry-run must not write to the live install dir)
+if (!dryRun) {
+  execFileSync(path.join(projectRoot, 'scripts', 'sync-installed.sh'), [], { stdio: 'inherit' });
 }
 
 configure('Claude Code', path.join(homeDir, '.claude', 'settings.json'), [

@@ -67,16 +67,22 @@ Claude Code plugin。主 agent 做完事情後，**偷偷**往它自己的 conte
 
 ### 掛載點
 
-`/Users/51mini/.claude/settings.json` 第 102 / 113 / 131 行，三個 hook **直接指向 repo 工作區**：
+`/Users/51mini/.claude/settings.json` 三個 hook **指向已 commit 的安裝副本**（見 §7 缺陷二）：
 
 ```
-node /Users/51mini/secret-cheeragent/hooks/pretool_inject.js
-node /Users/51mini/secret-cheeragent/hooks/sessionstart.js
-node /Users/51mini/secret-cheeragent/hooks/capture.js
+node /Users/51mini/.local/share/secret-cheeragent/hooks/pretool_inject.js
+node /Users/51mini/.local/share/secret-cheeragent/hooks/sessionstart.js
+node /Users/51mini/.local/share/secret-cheeragent/hooks/capture.js
 ```
+
+安裝副本由 `scripts/sync-installed.sh`（`git archive HEAD` → 整個 mv 換位）產生，
+`.git/hooks/post-commit` 自動掛了它——**每次 commit 都會重新同步**。
 
 `plugin.json` 裡另有一份用 `${CLAUDE_PLUGIN_ROOT}` 的正式宣告，但**實際生效的是 settings.json 那三行**。
-這件事有後果，見 §7 缺陷二。
+
+兩個載入時機要分清楚（見 §7 缺陷二）：
+- **hook 腳本**（每次觸發才 node 執行）＝熱生效，但現在指已 commit 副本，改 repo 要 **commit** 才換到線上。
+- **settings.json（hook 註冊表）**＝ session 啟動時冷載入，改完要**重開 session** 才生效。
 
 ---
 
@@ -215,10 +221,10 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 | 1 | 觀察真實 jackpot：下個新 session 開起來，查 log 有無 `jackpot: 3` | 只讀 `/Users/51mini/.claude/logs/cheerleader.log` | 等事件發生，不需改碼 |
 | 2 | 補 `finalize()` 回 null 的兩個缺漏檢查 | `/Users/51mini/secret-cheeragent/hooks/pretool_inject.js`、`hooks/sessionstart.js` 的 `forced_floor` 段 | **已修**（683bca5），見缺陷三 |
 | 3 | 處理陳舊 harness：更新或刪除 | `/Users/51mini/secret-cheeragent/test/run_tests.js` | **已刪**，見缺陷一 |
-| 4 | hook 改指已 commit 的安裝副本 | `/Users/51mini/.claude/settings.json` 102/113/131 行 ＋ `scripts/install-local.js` | **使用者未決**，要動就開工單 |
-| 5 | `\|\|` → `??` 讓 `0` 能關閉最小間隔 | `/Users/51mini/secret-cheeragent/lib/budget.js` | **使用者未決**，一行改動 |
+| 4 | hook 改指已 commit 的安裝副本 | `/Users/51mini/.claude/settings.json` ＋ `scripts/install-local.js` ＋ 新增 `scripts/sync-installed.sh` | **已修**，見缺陷二 |
+| 5 | `\|\|` → `??` 讓 `0` 能關閉最小間隔 | `/Users/51mini/secret-cheeragent/lib/budget.js` | **已修**（e1abeca） |
 
-第 4、5 項是使用者尚未拍板的設計取捨，不要自己決定就動；第 2、3 項屬於明確的缺漏，可逕行修補。
+第 2–5 項均已在 2026-09-21 工單拍板並修畢（見上表）。
 
 ### 最優先：jackpot 尚未有真實世界證據
 
@@ -254,17 +260,21 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 
 ### 缺陷二：hook 指向 git 工作區，子代理的中途狀態會即時生效
 
-`/Users/51mini/.claude/settings.json` 三行都指工作區。
-hook **腳本檔是每次觸發才 node 執行**（熱生效），所以任何在這個 repo 工作的子代理，
-它**還沒 commit、還沒跑過測試**的中途編輯會立刻對主 session 生效。
-09-21 實證：派工期間主 session 收到的注入文字當場換成新格式，而那份 code 當時還沒 commit。
+**已修**。`/Users/51mini/.claude/settings.json` 三個 hook 現在指已 commit 的安裝副本
+`/Users/51mini/.local/share/secret-cheeragent/hooks/`，由 `scripts/sync-installed.sh` 同步
+（`git archive HEAD` → 整個 `mv` 換位，`.git/hooks/post-commit` 自動掛上，commit 即同步）。
+`scripts/install-local.js` 的 hook 路徑也跟著指向安裝副本，並在 configure 前先跑一次同步。
 
-（對比：hook **註冊表** —— 有哪些 hook、matcher 是什麼 —— 是 session 啟動時冷載入，改了要重開 session。
-兩個時機不同，見 fixindex 9290 與 0316#3。）
+先前症結與原理不變，只是落點改了：
+- hook **腳本檔是每次觸發才 node 執行**（熱生效）。現在指已 commit 副本，所以 repo 改動要
+  **commit** 才會換到線上——中途未 commit 的編輯不再洩進主 session。
+- **新副作用：`corpus.json` 的 config 被 hook 讀取（`getConfig()`）時是從安裝副本讀的，
+  改 repo 的 config 要 commit 才生效。**
+- **註冊表**（settings.json：有哪些 hook、command、matcher）是 session 啟動時冷載入，
+  改了要**重開 session** 才生效（見 fixindex 9290 與 0316#3）。
 
-修法是讓 hook 指向一份已 commit 的安裝副本（`/Users/51mini/secret-cheeragent/scripts/install-local.js` 是現成的起點）。
-**尚未決定要不要做。** 沿用現狀就得接受：在這個 repo 派工期間主 session 行為會中途改變，
-而且壞掉的症狀會出現在完全無關的地方。
+若以後手動改 settings.json 之外的三模型 hook，就沒有同步自動化，需自己重跑
+`scripts/install-local.js`。
 
 ### 缺陷三：`finalize()` 回 null 時只有一條路徑檢查
 
