@@ -218,7 +218,7 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 
 | # | 事項 | 動哪個檔 | 狀態 |
 |---|---|---|---|
-| 1 | 觀察真實 jackpot：下個新 session 開起來，查 log 有無 `jackpot: 3` | 只讀 `/Users/51mini/.claude/logs/cheerleader.log` | 等事件發生，不需改碼 |
+| 1 | 觀察真實 jackpot **成功注入**那一筆 | 只讀 `/Users/51mini/.claude/logs/cheerleader.log` | 計算與保留分支已有實證，只差注入；2026-09-22 01:34Z 後自然會中 |
 | 2 | 補 `finalize()` 回 null 的兩個缺漏檢查 | `/Users/51mini/secret-cheeragent/hooks/pretool_inject.js`、`hooks/sessionstart.js` 的 `forced_floor` 段 | **已修**（683bca5），見缺陷三 |
 | 3 | 處理陳舊 harness：更新或刪除 | `/Users/51mini/secret-cheeragent/test/run_tests.js` | **已刪**，見缺陷一 |
 | 4 | hook 改指已 commit 的安裝副本 | `/Users/51mini/.claude/settings.json` ＋ `scripts/install-local.js` ＋ 新增 `scripts/sync-installed.sh` | **已修**，見缺陷二 |
@@ -226,21 +226,28 @@ grep -c '"action":"injected_orphan"' /Users/51mini/.claude/logs/cheerleader.log
 
 第 2–5 項均已在 2026-09-21 工單拍板並修畢（見上表）。
 
-### 最優先：jackpot 尚未有真實世界證據
+### 待辦 1：jackpot 的實證進度（2026-09-21 觀測）
 
-程式碼與測試都綠，但**真的 jackpot 從沒在生產環境跑過**。
-`/Users/51mini/.claude/state/cheer_queue/` 現在剛好卡著 3 張：
+`handleOrphan()` 只在 SessionStart 觸發。已確認的事：
+
+- **`jackpot: 3` 計算正確**、**被擋下時整堆原封不動留在佇列** —— 兩個分支都有生產 log 實證
+- 還沒看到的只有「成功注入」那一筆（`action: "injected_orphan"`、前綴 `【應援・累積 3 份】`、三個檔案同時消失）
 
 ```
-01a0bdba-...-2026-09-20T07-35-25-691Z.json
-0e4dfb69-...-2026-09-20T15-26-01-732Z.json
-01a0c199-...-2026-09-21T04-29-21-868Z.json
+06:52:25Z  skipped_min_interval      tier:2  jackpot:3  orphans not consumed, kept in queue
+06:53:34Z  skipped_min_interval      tier:2  jackpot:3  orphans not consumed, kept in queue
+07:00:17Z  skipped_budget_exhausted  tier:2  jackpot:3  orphans not consumed, kept in queue
 ```
 
-`handleOrphan()` 只在 SessionStart 觸發 → **下一個新 session 開起來就是驗收現場**。
-預期：log 出現一筆 `action: "injected_orphan"`、`jackpot: 3`、前綴 `【應援・累積 3 份】`、
-三個檔案同時消失、`maxTokens = 44 + 2×10 = 64`。
-沒中的話看是不是被 `skipped_min_interval` 或 `skipped_budget_exhausted` 擋下（那是正確行為，整堆會留著）。
+最後一筆差在算術，不是 bug：滾動視窗 `used_tokens = 177`，`daily_token_budget = 240`，**剩 63**；
+jackpot 3 張要 `max_injection_tokens 44 + 2 × jackpot_bonus_tokens 10 = 64`。**差 1 個 token**。
+
+視窗最舊那筆是 `2026-09-21T01:34:28Z`（25t）。**2026-09-22 01:34Z**（本地 09:34）它掉出 24h 視窗後
+`used` 降到 152、剩 88 > 64，之後第一個新 session 開起來就會中。**不需要改任何東西**，等就好。
+
+觀測方法備忘：`claude -p` **不觸發 SessionStart**（只有 Stop hook 的 `capture.js` 會跑），
+要驗得起一個真的互動 session，無頭機用 `tmux -L <name> new-session -d -s probe claude`，
+看完 log 再 `tmux -L <name> kill-server`。
 
 ### 缺陷一：`test/run_tests.js` 陳舊，16/30 紅字是假警報
 
