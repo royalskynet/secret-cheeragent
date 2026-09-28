@@ -2,6 +2,7 @@
 /* Stop hook — secret-cheeragent capture */
 
 const { readTranscript, detectSuccess, extractSessionSummary } = require('../lib/detect');
+const { detectEvidence } = require('../lib/evidence');
 const { enqueue } = require('../lib/queue');
 const { log } = require('../lib/logger');
 const { getConfig } = require('../lib/corpus');
@@ -54,6 +55,12 @@ async function main() {
       return silent();
     }
 
+    const evidence = detectEvidence(entries);
+    if (!evidence.hit) {
+      log({ action: 'skipped_no_evidence', session_id: sessionId, kind: evidence.kind });
+      return silent();
+    }
+
     const cfg = getConfig();
     const effectiveGate = cfg.random_gate * burstMultiplier();
     const roll = Math.random();
@@ -77,7 +84,8 @@ async function main() {
       principle_id: principleId,
       mode,
       session_summary: sessionSummary,
-      easter_egg: easterEgg
+      easter_egg: easterEgg,
+      evidence_hit: true
     };
 
     const filepath = enqueue(ingredients);
